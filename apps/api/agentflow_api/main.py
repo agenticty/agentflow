@@ -15,14 +15,10 @@ if not os.getenv("OPENAI_API_KEY"):
 
 app = FastAPI(title="AgentFlow API", version="0.2.0")
 
-# CORS
+# CORS - TEMPORARY: Allow all origins for testing
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://agentflow-tau.vercel.app",  # Your production frontend
-        "http://localhost:3000",              # Local development
-        "https://*.vercel.app",               # Any Vercel preview deployments
-    ],
+    allow_origins=["*"],  # Allow everything temporarily
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
