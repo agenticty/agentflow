@@ -1,0 +1,11 @@
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+motor==3.6.0
+pydantic==2.9.2
+python-dotenv==1.0.1
+crewai==0.86.0
+duckduckgo-search==6.3.5
+requests==2.32.3
+litellm==1.52.13
+openai==1.54.5
+pydantic-settings==2.6.1
