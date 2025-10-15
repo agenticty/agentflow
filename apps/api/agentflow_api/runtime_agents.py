@@ -1,6 +1,6 @@
 # apps/api/agentflow_api/runtime_agents.py
 import os, re, json, requests
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from crewai import Agent, Task, Crew, Process
 from crewai.tools import tool
 
