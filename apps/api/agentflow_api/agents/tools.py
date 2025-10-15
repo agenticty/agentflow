@@ -3,7 +3,7 @@ import json
 import re
 import requests
 from typing import List, Dict, Any
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from crewai.tools import tool
 
 USER_AGENT = "Mozilla/5.0 (AgentFlow/0.1; +https://example.local)"
