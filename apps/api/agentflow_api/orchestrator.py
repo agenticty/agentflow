@@ -103,6 +103,12 @@ async def run_workflow(run_id: str):
 
 
     # tiny helpers -------------------------------------------------------------
+
+    def _has_preloaded_site(pre_ctx: str) -> bool:
+        return "##COMPANY WEBSITE CONTENT##" in (pre_ctx or "")
+
+
+
     def _get_path(src: dict, path: str):
         val = src
         for p in path.split("."):
@@ -152,10 +158,54 @@ async def run_workflow(run_id: str):
             # Include context from the last two steps (if any)
             prev_context = "\n\n".join([o.get("text", "") for o in outputs[-2:]])
 
-            # Run the task (off the event loop)
-            text_out = await asyncio.to_thread(
-                run_single_task, agent, description, expected, prev_context
-            )
+            
+            if agent_kind == "research":
+                
+                website = inputs.get("website", "").strip()
+                company = inputs.get("company", "").strip()
+                
+                pre_context = prev_context
+                if website:
+                    await append_log(run_id, "fetching_website", {
+                        "index": i,
+                        "url": website,
+                        "reason": "Using provided website as primary source"
+                    })
+                    
+                    from .runtime_agents import clean_url
+                    try:
+
+                        website_content = clean_url._run(website)
+
+                        if "Download failed" or "No extractable text" not in website_content:
+                            pre_context = (
+                                "##COMPANY WEBSITE CONTENT##\n"
+                                f"{website_content}\n"
+                                "##END COMPANY WEBSITE CONTENT##\n\n"
+                                f"{prev_context}"
+                            )
+                            await append_log(run_id, "website_fetched", {
+                                "index": i,
+                                "status": "success",
+                                "length": len(website_content)
+                            })
+                    except Exception as e:
+                        await append_log(run_id, "website_fetch_failed", {
+                            "index": i,
+                            "error": str(e)
+                        })
+                
+                # Run research with website content pre-loaded
+                text_out = await asyncio.to_thread(
+                    run_single_task, agent, description, expected, pre_context
+                )
+            else:
+                # Non-research tasks: normal execution
+                text_out = await asyncio.to_thread(
+                    run_single_task, agent, description, expected, prev_context
+                )
+
+            
 
     
             # Single log event with all data
@@ -170,44 +220,141 @@ async def run_workflow(run_id: str):
             outputs.append({"index": i, "agent": agent_kind, "text": text_out})
             await append_log(run_id, "step:end", {"index": i})
 
-            # Guardrail: stop early on explicit uncertainty
-            if isinstance(text_out, str) and "I can't answer that." in text_out:
-                await append_log(run_id, "finished", {"status": "stopped"})
-                await db.workflow_runs.update_one(
-                    {"_id": ObjectId(run_id)},
-                    {"$set": {
-                        "status": "success",
-                        "finished_at": datetime.now(timezone.utc),
-                        "output": {"steps": outputs}
-                    }}
-                )
-                return
+            if agent_kind == "research":
+                await append_log(run_id, "debug", {
+                    "raw_output": text_out,
+                    "length": len(text_out),
+                    "has_urls": "http" in text_out.lower(),
+                    "has_cant_answer": "can't answer" in text_out.lower()
+                })
+
+            
+            
             
             if agent_kind == "research":
-                ok_sources = sum(("openai.com" in o["text"].lower() or "reuters.com" in o["text"].lower()
-                                or "bloomberg.com" in o["text"].lower() or "bbc.co.uk" in o["text"].lower()
-                                or "apnews.com" in o["text"].lower()) for o in outputs[-1:])
-                if ok_sources == 0:
-                    await append_log(run_id,"finished",{"status":"stopped"})
-                    await db.workflow_runs.update_one({"_id": ObjectId(run_id)},{"$set":{
-                        "status":"success","finished_at": datetime.now(timezone.utc),
-                        "output":{"steps": outputs, "note":"Stopped: no credible sources"}}})
-                    return
+                # Import the scoring function
+                from .runtime_agents import score_research_quality
                 
+                # Score the research quality
+                quality_score = score_research_quality(text_out)
+                
+                # Log the quality assessment
+                await append_log(run_id, "research:quality", {
+                    "index": i,
+                    "confidence": quality_score["confidence"],
+                    "quality": quality_score["quality"],
+                    "sources": {
+                        "tier1": quality_score["tier1_sources"],
+                        "tier2": quality_score["tier2_sources"],
+                        "total_credible": quality_score["total_credible"],
+                        "total_found": quality_score["total_urls"]
+                    }
+                })
+                
+                # Stop if quality is too low
+                if not quality_score["passed"]:
+                    reason = f"Research confidence too low ({quality_score['confidence']}%)"
+                    detail_parts = []
+                    
+                    if quality_score["total_credible"] == 0:
+                        detail_parts.append("No credible sources found")
+                    else:
+                        detail_parts.append(f"Found {quality_score['total_credible']} credible source(s), need 2+ high-quality")
+                    
+                    if quality_score["total_urls"] > 0:
+                        detail_parts.append(f"Checked {quality_score['total_urls']} URLs total")
+                    
+                    detail = " • ".join(detail_parts)
+                    
+                    await append_log(run_id, "finished", {
+                        "status": "stopped",
+                        "reason": reason,
+                        "detail": detail,
+                        "recommendation": "Manual research recommended - try alternative sources or verify company name"
+                    })
+                    
+                    await db.workflow_runs.update_one(
+                        {"_id": ObjectId(run_id)},
+                        {"$set": {
+                            "status": "stopped_low_quality",
+                            "finished_at": datetime.utcnow(),
+                            "output": {
+                                "steps": outputs,
+                                "stop_reason": reason,
+                                "quality_score": quality_score
+                            }
+                        }}
+                    )
+                    return
+            
             
             import json as _json
             if agent_kind == "qualify":
                 try:
                     q = _json.loads(text_out)
                 except Exception:
-                    q = {}
+                    q = {"score": 0, "decision": "no", "reasons": ["Invalid qualification format"]}
+                
+                # Enhanced qualification validation
                 matches = q.get("criterion_match") or {}
+                reasons = q.get("reasons") or []
+                score = int(q.get("score", 0))
+                
+                # Count how many ICP criteria are met
                 positives = sum(bool(v) for v in matches.values())
-                # cap score if no evidence
+                
+                # Adjust score based on evidence strength
                 if positives < 2:
-                    q["score"] = min(int(q.get("score", 0)), 60)
-                    q["decision"] = "maybe" if q["score"] >= 50 else "no"
-                    text_out = _json.dumps(q)
+                    # Not enough evidence - cap score
+                    score = min(score, 60)
+                    q["score"] = score
+                    q["decision"] = "maybe" if score >= 50 else "no"
+                    if "Low evidence count" not in " ".join(reasons):
+                        q["reasons"].append(f"Only {positives} ICP criterion clearly matched (need 2+)")
+                
+                # Add confidence indicator
+                if positives >= 4 and score >= 80:
+                    q["confidence"] = "high"
+                elif positives >= 3 and score >= 65:
+                    q["confidence"] = "medium"
+                elif positives >= 2 and score >= 50:
+                    q["confidence"] = "low"
+                else:
+                    q["confidence"] = "insufficient"
+                
+                text_out = _json.dumps(q, indent=2)
+                
+                # Log qualification quality
+                await append_log(run_id, "qualify:assessed", {
+                    "index": i,
+                    "score": q["score"],
+                    "decision": q["decision"],
+                    "confidence": q.get("confidence", "unknown"),
+                    "criteria_matched": positives,
+                    "total_criteria": len(matches)
+                })
+                
+                # Stop if decisively disqualified
+                if q["decision"] == "no" and q["score"] < 40:
+                    await append_log(run_id, "finished", {
+                        "status": "stopped",
+                        "reason": f"Lead disqualified (score: {q['score']}/100)",
+                        "detail": " • ".join(q["reasons"][:3]),  # Top 3 reasons
+                        "recommendation": "Does not match ICP - skip outreach"
+                    })
+                    
+                    await db.workflow_runs.update_one(
+                        {"_id": ObjectId(run_id)},
+                        {"$set": {
+                            "status": "disqualified",
+                            "finished_at": datetime.utcnow(),
+                            "output": {
+                                "steps": outputs,
+                                "qualification": q
+                            }
+                        }}
+                    )
+                    return
 
 
 

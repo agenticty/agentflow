@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 
-from .tools import web_search, fetch_url
+from .tools import web_search, clean_url
 
 load_dotenv()
 
@@ -48,7 +48,7 @@ def run_outreach_crew(
         role="Outreach Email Writer",
         goal="Write a short, personalized cold email pitching AgentFlow with a clear CTA.",
         backstory="You craft respectful, concise B2B emails. You reference specifics responsibly.",
-        tools=[] if context else [web_search, fetch_url],
+        tools=[] if context else [web_search, clean_url],
         verbose=False,
         allow_delegation=False,
     )
@@ -87,7 +87,7 @@ def run_outreach_crew(
             Steps (if you choose to research):
             1) Use web_search for "{company} company overview" or "news {company}".
             2) Parse JSON results; pick 1–2 credible URLs.
-            3) Use fetch_url on 1–2 links. If blocked/paywalled, skip it.
+            3) Use clean_url on 1–2 links. If blocked/paywalled, skip it.
 
             Use any discovered fact(s) sparingly—only if confident.
 

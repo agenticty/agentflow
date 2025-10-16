@@ -1,28 +1,46 @@
 "use client";
-
+import { useState } from "react";
 import WorkflowList from "@/components/workflows/WorkflowList";
 import CreateWorkflowForm from "@/components/workflows/CreateWorkflowForm";
+import RecentRuns from "@/components/workflows/RecentRuns";
+import LogDrawer from "@/components/workflows/LogDrawer";
 import SetupGate from "@/components/app/SetupGate";
-import { useState } from "react";
 
 
 export default function AppPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+  const [logRunId, setLogRunId] = useState<string | null>(null);
+
   return (
     <SetupGate>
       {(configured) => (
+        <>
         <div className="grid gap-8 lg:grid-cols-[1fr,420px]">
           <section>
             <header className="mb-4">
               <h1 className="text-2xl font-semibold tracking-tight">
-              Research-Qualify-Outreach Workflow
+                Research-Qualify-Outreach Workflow
               </h1>
               <p className="text-sm text-zinc-600">
-              Give us a company and contact. Our AI employees research them, check if they&apos;re a fit, and draft a personalized email. 
+                Give a company & contact. We&apos;ll research, check fit, and draft an email.
               </p>
             </header>
+
             <WorkflowList configured={configured} />
+
+            {/* Recent Runs Section */}
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">Recent Runs</h2>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-xs text-zinc-500 hover:text-zinc-700"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
+              <RecentRuns onViewLogs={(id) => setLogRunId(id)} />
+            </div>
           </section>
 
           <aside className="space-y-4">
@@ -32,10 +50,10 @@ export default function AppPage() {
               className="w-full rounded-lg border px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center justify-between"
             >
               <span>Advanced: Custom Workflows</span>
-              <svg 
+              <svg
                 className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -58,7 +76,13 @@ export default function AppPage() {
             </div>
           </aside>
         </div>
+          {logRunId && (
+            <LogDrawer runId={logRunId} onClose={() => setLogRunId(null)} />
+          )}
+          </>
       )}
+
+      
     </SetupGate>
   );
 }

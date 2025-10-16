@@ -75,6 +75,61 @@ export default function SettingsPage() {
       return copy;
     });
   }
+
+  function validate(): { errors: string[]; warnings: string[] } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Required fields
+    if (!form.name?.trim()) {
+      errors.push("Company name is required");
+    }
+
+    if (!form.product_one_liner?.trim()) {
+      errors.push("Product one-liner is required");
+    }
+
+    // Value props validation
+    if (!form.value_props || form.value_props.length === 0) {
+      errors.push("Add at least 1 value proposition");
+    }
+
+    // ICP validation
+    const csv = (s: string) => s.split(",").map(t => t.trim()).filter(Boolean);
+    const industries = csv(industriesText);
+    const roles = csv(rolesText);
+    const regions = csv(regionsText);
+    const techSignals = csv(techText);
+
+    const icpFieldCount = industries.length + roles.length + regions.length + techSignals.length;
+
+    if (icpFieldCount < 2) {
+      errors.push("ICP needs at least 2 filled fields (industries, roles, regions, or tech signals)");
+    }
+
+    // Warnings (not blocking)
+    if (industries.length === 0) {
+      warnings.push("Recommendation: Add target industries for better qualification");
+    }
+
+    if (roles.length === 0) {
+      warnings.push("Recommendation: Add target roles for better outreach");
+    }
+
+    // Employee range validation
+    const minEmp = minEmpText ? parseInt(minEmpText, 10) : undefined;
+    const maxEmp = maxEmpText ? parseInt(maxEmpText, 10) : undefined;
+
+    if (minEmp !== undefined && maxEmp !== undefined && minEmp >= maxEmp) {
+      errors.push("Min employees must be less than max employees");
+    }
+
+    if (minEmp !== undefined && minEmp < 0) {
+      errors.push("Min employees cannot be negative");
+    }
+
+    return { errors, warnings };
+  }
   
   const arrToCsv = (a?: string[]) => (a || []).join(", ");
 
@@ -214,10 +269,22 @@ export default function SettingsPage() {
 
 
   async function save() {
-    setOkMsg(null); setErrMsg(null); setBusy(true);
-  
-    // 1) Build ICP from current text boxes (no need to blur first)
-    const csv = (s: string) => s.split(",").map(t=>t.trim()).filter(Boolean);
+    setOkMsg(null);
+    setErrMsg(null);
+
+    // Run validation BEFORE attempting to save
+    const validation = validate();
+
+    // Show validation errors
+    if (validation.errors.length > 0) {
+      setErrMsg(`Cannot save: ${validation.errors[0]}`);
+      return;
+    }
+
+    setBusy(true);
+
+    // Build ICP from current text boxes
+    const csv = (s: string) => s.split(",").map(t => t.trim()).filter(Boolean);
     const nextForm = {
       ...form,
       icp: {
@@ -233,7 +300,7 @@ export default function SettingsPage() {
       },
       disqualifiers: csv(disqText),
     };
-  
+
     try {
       const base = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
       const r = await fetch(`${base}/api/org/profile`, {
@@ -242,12 +309,18 @@ export default function SettingsPage() {
         body: JSON.stringify(nextForm),
       });
       if (!r.ok) throw new Error("Save failed.");
-  
-      // 2) Update local state from what we just saved
+
+      // Update local state
       setForm(nextForm);
       setInitial(nextForm);
-      setOkMsg("Saved. You’re ready to run!");
-    } catch (e:any) {
+
+      // Show success with warnings if any
+      if (validation.warnings.length > 0) {
+        setOkMsg(`Saved! 💡 ${validation.warnings[0]}`);
+      } else {
+        setOkMsg("Saved! ✓ You're ready to run workflows.");
+      }
+    } catch (e: any) {
       setErrMsg(e.message || "Error saving.");
     } finally {
       setBusy(false);
@@ -269,6 +342,43 @@ export default function SettingsPage() {
           ? "You're all set! You can run the workflow now."
           : "Setup needed. Fill this in once (about 2 minutes)."}
       </div>
+
+      {(() => {
+        const validation = validate();
+        const hasErrors = validation.errors.length > 0;
+        const hasWarnings = validation.warnings.length > 0;
+
+        if (!hasErrors && !hasWarnings) return null;
+
+        return (
+          <div className={`rounded-xl border px-4 py-3 ${hasErrors
+              ? "bg-rose-50 border-rose-200"
+              : "bg-amber-50 border-amber-200"
+            }`}>
+            {hasErrors && (
+              <div className="space-y-1">
+                <div className="font-medium text-rose-900">⚠️ Fix these before saving:</div>
+                <ul className="text-sm text-rose-700 space-y-0.5 ml-4">
+                  {validation.errors.map((err, i) => (
+                    <li key={i}>• {err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {!hasErrors && hasWarnings && (
+              <div className="space-y-1">
+                <div className="font-medium text-amber-900">💡 Recommendations:</div>
+                <ul className="text-sm text-amber-700 space-y-0.5 ml-4">
+                  {validation.warnings.map((warn, i) => (
+                    <li key={i}>• {warn}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <h1 className="text-2xl font-semibold">Organization Settings</h1>
 
@@ -378,7 +488,7 @@ export default function SettingsPage() {
             />
           </label>
           <label className="block text-sm">
-            <span className="text-zinc-700">Tech signals (comma-separated)</span>
+            <span className="text-zinc-700">Other fit clues (keywords, traits, etc.) (comma-separated)</span>
             <input
               value={techText}
               onChange={(e)=>setTechText(e.target.value)}
@@ -486,13 +596,16 @@ export default function SettingsPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          disabled={busy || !changed}
+          disabled={busy || !changed || validate().errors.length > 0}
           className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
         >
           {busy ? "Saving…" : changed ? "Save" : "Saved"}
         </button>
         {okMsg && <span className="text-sm text-emerald-700">{okMsg}</span>}
         {errMsg && <span className="text-sm text-rose-700">{errMsg}</span>}
+        {validate().errors.length > 0 && !errMsg && (
+          <span className="text-sm text-rose-600">⚠️ Fix errors above</span>
+        )}
         <a href="/app" className="ml-auto text-sm underline">Go to App</a>
       </div>
     </div>

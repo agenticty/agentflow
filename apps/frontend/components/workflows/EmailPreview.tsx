@@ -1,3 +1,4 @@
+/*EmailPreview.tsx */
 "use client";
 import { useState } from "react";
 
@@ -12,6 +13,9 @@ function parseEmail(text: string) {
 export default function EmailPreview({ text, to }: { text: string; to?: string }) {
   const { subject, body } = parseEmail(text);
   const [copied, setCopied] = useState<"s"|"b"|"all"|null>(null);
+
+  const wordCount = body.split(/\s+/).filter(w => w.length > 0).length;
+  const isGoodLength = wordCount >= 50 && wordCount <= 100;
 
   async function copy(t: string, which: "s"|"b"|"all") {
     try { await navigator.clipboard.writeText(t); setCopied(which); setTimeout(()=>setCopied(null), 1500); } catch {}
@@ -49,10 +53,15 @@ export default function EmailPreview({ text, to }: { text: string; to?: string }
         <div className="mt-1 rounded-lg border bg-zinc-50 px-3 py-2 text-sm">{subject}</div>
       </div>
       <div className="mt-3">
-        <div className="text-sm font-medium">Body</div>
-        <pre className="mt-1 rounded-lg border bg-zinc-50 px-3 py-2 text-sm whitespace-pre-wrap">{body}</pre>
-        <p className="mt-2 text-xs text-zinc-500">Tip: Make sure the body includes one concrete fact from research (marked [#]).</p>
-
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">Body</div>
+          <div className={`text-xs ${isGoodLength ? "text-emerald-600" : "text-amber-600"}`}>
+            {wordCount} words {isGoodLength ? "✓" : "(aim for 60-90)"}
+          </div>
+        </div>
+        <pre className="mt-1 rounded-lg border bg-zinc-50 px-3 py-2 text-sm whitespace-pre-wrap">
+          {body}
+        </pre>
       </div>
     </div>
   );

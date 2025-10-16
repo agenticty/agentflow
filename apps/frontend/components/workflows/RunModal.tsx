@@ -58,50 +58,71 @@ export default function RunModal({
   async function start(e: React.FormEvent) {
     e.preventDefault();
 
-    console.log("Form values:", values);
-  if (!values.lead_email?.trim()) {
-    setErr("Contact email is required");
-    return;
-  }
-
-  const requiredFields = schema.filter(f => f.required);
-  for (const field of requiredFields) {
-    const val = values[field.name]?.trim();
-    if (!val) {
-      setErr(`${field.label} is required`);
+      console.log("Form values:", values);
+    if (!values.lead_email?.trim()) {
+      setErr("Contact email is required");
       return;
     }
-    
-    // Extra validation for email
-    if (field.type === "email" && val) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(val)) {
-        setErr(`${field.label} must be a valid email`);
+
+    const requiredFields = schema.filter(f => f.required);
+    for (const field of requiredFields) {
+      const val = values[field.name]?.trim();
+      if (!val) {
+        setErr(`${field.label} is required`);
         return;
       }
-    }
-  }  
 
-    setErr(null);
-    setBusy(true);
-    try {
-      const base = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-      const r = await fetch(`${base}/api/workflow-runs`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workflow_id: workflow.id, inputs: values }),
-      });
-      if (!r.ok) throw new Error(`Run failed (${r.status})`);
-      const data: unknown = await r.json();
-      const runId = (data as { id?: string }).id;
-      if (!runId) throw new Error("No run id returned");
-      onStart(runId);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErr(msg);
-    } finally {
-      setBusy(false);
-    }
+      // Validate company name isn't too vague
+      const company = values.company?.trim();
+      if (company && company.length < 3) {
+        setErr("Company name too short - please enter full company name");
+        return;
+      }
+
+      // Check for common placeholder values
+      const placeholders = ['test', 'example', 'acme', 'company', 'corp', 'inc'];
+      if (company && placeholders.includes(company.toLowerCase())) {
+        setErr("Please enter a real company name (not a placeholder)");
+        return;
+      }
+
+      // Warn if company name looks suspicious
+      if (company && !/[a-zA-Z]/.test(company)) {
+        setErr("Company name should contain letters");
+        return;
+      }
+
+      
+      // Extra validation for email
+      if (field.type === "email" && val) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(val)) {
+          setErr(`${field.label} must be a valid email`);
+          return;
+        }
+      }
+    }  
+
+      setErr(null);
+      setBusy(true);
+      try {
+        const base = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+        const r = await fetch(`${base}/api/workflow-runs`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ workflow_id: workflow.id, inputs: values }),
+        });
+        if (!r.ok) throw new Error(`Run failed (${r.status})`);
+        const data: unknown = await r.json();
+        const runId = (data as { id?: string }).id;
+        if (!runId) throw new Error("No run id returned");
+        onStart(runId);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setErr(msg);
+      } finally {
+        setBusy(false);
+      }
   }
 
   const advancedJson = JSON.stringify(values, null, 2);

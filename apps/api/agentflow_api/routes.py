@@ -204,3 +204,61 @@ async def stream_logs(run_id: str, request: Request):
                 break
             yield chunk
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/workflow-runs/recent")
+async def get_recent_runs(limit: int = 5):
+    """Get recent workflow runs with status."""
+    db = await get_db()
+    
+    cursor = db.workflow_runs.find({}).sort([("started_at", -1)]).limit(limit)
+    
+    runs = []
+    async for run in cursor:
+        # Get workflow name
+        workflow = await db.workflows.find_one({"_id": run["workflow_id"]})
+        workflow_name = workflow.get("name", "Unknown") if workflow else "Unknown"
+        
+        # Get company name from inputs
+        company = run.get("inputs", {}).get("company", "Unknown")
+        
+        runs.append({
+            "id": str(run["_id"]),
+            "workflow_id": str(run["workflow_id"]),
+            "workflow_name": workflow_name,
+            "company": company,
+            "status": run.get("status", "unknown"),
+            "started_at": run.get("started_at").isoformat() if run.get("started_at") else None,
+            "finished_at": run.get("finished_at").isoformat() if run.get("finished_at") else None,
+        })
+    
+    return runs
+
+
+@router.get("/workflow-runs/{run_id}")
+async def get_run_details(run_id: str):
+    """Get details of a specific workflow run."""
+    db = await get_db()
+    
+    try:
+        run = await db.workflow_runs.find_one({"_id": ObjectId(run_id)})
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        
+        # Get workflow name
+        workflow = await db.workflows.find_one({"_id": run["workflow_id"]})
+        workflow_name = workflow.get("name", "Unknown") if workflow else "Unknown"
+        
+        return {
+            "id": str(run["_id"]),
+            "workflow_id": str(run["workflow_id"]),
+            "workflow_name": workflow_name,
+            "status": run.get("status", "unknown"),
+            "started_at": run.get("started_at").isoformat() if run.get("started_at") else None,
+            "finished_at": run.get("finished_at").isoformat() if run.get("finished_at") else None,
+            "inputs": run.get("inputs", {}),
+            "output": run.get("output"),
+            "error": run.get("error"),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

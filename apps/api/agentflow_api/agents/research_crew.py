@@ -6,7 +6,7 @@ from typing import Tuple
 from crewai import Agent, Task, Crew, Process
 from dotenv import load_dotenv
 
-from .tools import web_search, fetch_url
+from .tools import web_search, clean_url
 
 load_dotenv()  # allow .env in dev
 
@@ -33,7 +33,7 @@ def run_research_crew(topic: str, audience: str) -> str:
         role="Topic Researcher",
         goal="Find trustworthy, recent information and summarize it with sources.",
         backstory="Fast, factual reconnaissance with citations.",
-        tools=[web_search, fetch_url],
+        tools=[web_search, clean_url],
         verbose=False,
         allow_delegation=False,
     )
@@ -54,7 +54,7 @@ def run_research_crew(topic: str, audience: str) -> str:
         Steps:
         1) Use web_search with queries like: "{topic} latest 2025", "news {topic}", "{topic} report insights".
         2) Parse the JSON result into objects with "title", "snippet", "url"; pick credible URLs.
-        3) Call fetch_url on 2–4 working URLs (avoid paywalls). If a fetch returns "ERROR", try another URL.
+        3) Call clean_url on 2–4 working URLs (avoid paywalls). If a fetch returns "ERROR", try another URL.
 
         Output (Markdown):
         - Exactly 3–5 bullets, each 1–2 sentences, factual and current.

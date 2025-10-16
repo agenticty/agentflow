@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 
-from .tools import web_search, fetch_url
+from .tools import web_search, clean_url
 
 load_dotenv()
 
@@ -35,7 +35,7 @@ def _extract_json(s: str) -> Optional[Dict[str, Any]]:
 def run_qualify_crew(company: str) -> Dict[str, Any]:
     """
     One-agent qualify flow:
-      - Qualifier does a small bit of research (using web_search + fetch_url)
+      - Qualifier does a small bit of research (using web_search + clean_url)
       - Returns STRICT JSON decision:
         {
           "qualified": true|false,
@@ -57,7 +57,7 @@ def run_qualify_crew(company: str) -> Dict[str, Any]:
         role="Lead Qualifier",
         goal="Decide if the company is a good fit for AgentFlow and justify succinctly.",
         backstory="Evaluates fit from public signals (automation appetite, process complexity, scale, tooling).",
-        tools=[web_search, fetch_url],
+        tools=[web_search, clean_url],
         verbose=False,
         allow_delegation=False,
     )
@@ -68,7 +68,7 @@ def run_qualify_crew(company: str) -> Dict[str, Any]:
 
         Do this quickly:
         1) Use web_search to find recent/company-overview info; parse JSON; extract credible URLs.
-        2) Use fetch_url on 1–3 working links (avoid paywalls); skim for signals of:
+        2) Use clean_url on 1–3 working links (avoid paywalls); skim for signals of:
            - Process complexity / repetitive workflows
            - Sales/RevOps/CS automation interest
            - Tech stack (CRM, integrations)
