@@ -15,25 +15,14 @@ if not os.getenv("OPENAI_API_KEY"):
 
 app = FastAPI(title="AgentFlow API", version="0.2.0")
 
-# CORS - TEMPORARY: Allow all origins for testing
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow everything temporarily
+    allow_origins=["https://agentflow-tau.vercel.app"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# DB-free health (never hangs)
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
-
-@app.get("/api/health")
-def api_health():
-    return {"ok": True, "service": "AgentFlow API"}
-
-# (Optional) tiny tracer while debugging
 @app.middleware("http")
 async def _dbg(request, call_next):
     print(">>", request.method, request.url.path)
