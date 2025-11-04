@@ -37,7 +37,7 @@ export default function RunModal({
     return [
       { name: "company", label: "Company name", type: "text", placeholder: "Acme Corp", required: true },
       { name: "website", label: "Company website", type: "url", placeholder: "https://acme.com", required: false },
-      { name: "lead_email", label: "Contact email", type: "email", placeholder: "ceo@acme.com", required: true },
+      { name: "lead_email", label: "Contact email", type: "email", placeholder: "ceo@acme.com", required: false },
     ];
   }, [workflow]);
   const [values, setValues] = useState<Record<string, string>>(
