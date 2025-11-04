@@ -59,10 +59,7 @@ export default function RunModal({
     e.preventDefault();
 
       console.log("Form values:", values);
-    if (!values.lead_email?.trim()) {
-      setErr("Contact email is required");
-      return;
-    }
+    
 
     const requiredFields = schema.filter(f => f.required);
     for (const field of requiredFields) {
