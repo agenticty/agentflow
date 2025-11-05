@@ -55,7 +55,7 @@ AgentFlow is a production-ready agentic AI platform designed to automate B2B rev
 **Backend:**
 - Python 3.11+
 - FastAPI
-- PostgreSQL
+- MongoDB
 - Docker
 
 **Frontend:**
@@ -76,7 +76,7 @@ AgentFlow is a production-ready agentic AI platform designed to automate B2B rev
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL
+- MongoDB
 - OpenAI API key
 
 
