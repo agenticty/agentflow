@@ -8,7 +8,7 @@ from .models import CreateWorkflowRequest, Workflow, CreateRunRequest, WorkflowR
 from bson import ObjectId
 from .orchestrator import sse_stream, run_workflow
 from .runtime_agents import make_researcher, run_single_task
-import json, re, asyncio
+import asyncio
 
 router = APIRouter()
 
@@ -111,7 +111,7 @@ async def org_from_url(payload: dict):
     # 4) OPTIONAL: one short LLM pass (hard 6s) to propose value props (skip if you prefer)
     try:
         async def llm():
-            from .agents import make_researcher, run_single_task
+            
             agent = make_researcher()
             desc = ("From this snippet, propose 2-3 short value props as a JSON array of strings. "
                     "Return JSON only.\n\nSNIPPET:\n" + (desc or h1 or title))

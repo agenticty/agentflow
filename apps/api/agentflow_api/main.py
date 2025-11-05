@@ -4,7 +4,6 @@ import os
 from dotenv import load_dotenv
 
 from .routes import router as base_router          # /api/* (workflows, runs, logs)
-from .route.agents import router as agents_router  # /api/agents/* (your agent endpoints)
 
 load_dotenv()
 
@@ -31,8 +30,7 @@ async def _dbg(request, call_next):
     return resp
 
 # Routers
-app.include_router(base_router, prefix="/api")   # e.g., /api/workflows, /api/workflow-runs
-app.include_router(agents_router)                # already has prefix="/api/agents"
+app.include_router(base_router, prefix="/api")  
 
 @app.get("/")
 def root():
