@@ -6,7 +6,7 @@ from crewai.tools import tool
 import trafilatura
 from bs4 import BeautifulSoup
 import requests, re, time
-from .agents.tools import USER_AGENT
+from .tools import USER_AGENT
 from functools import lru_cache  
 session = requests.Session()  
 
