@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 
 from .routes import router as base_router          # /api/* (workflows, runs, logs)
+from .routes_monitoring import router as monitoring_router
 
 load_dotenv()
 
@@ -30,7 +31,8 @@ async def _dbg(request, call_next):
     return resp
 
 # Routers
-app.include_router(base_router, prefix="/api")  
+app.include_router(base_router, prefix="/api")
+app.include_router(monitoring_router, prefix="/api/monitoring")  
 
 @app.get("/")
 def root():
